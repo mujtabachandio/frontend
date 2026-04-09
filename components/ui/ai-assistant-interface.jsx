@@ -184,6 +184,7 @@ export function AIAssistantInterface() {
                   : message
               )
             );
+            setIsLoading(false);
           } else if (payload.type === "audio") {
             playAudio(payload.audio_base64);
           } else if (payload.type === "audio_error") {
@@ -208,9 +209,10 @@ export function AIAssistantInterface() {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
+    const audioMessageId = createMessageId();
     setMessages((prev) => [
       ...prev,
-      { id: createMessageId(), role: "user", content: "🎤 Voice message" },
+      { id: audioMessageId, role: "user", content: "🎤 Voice message" },
     ]);
     try {
       const formData = new FormData();
@@ -225,6 +227,15 @@ export function AIAssistantInterface() {
         throw new Error("Request failed.");
       }
       const data = await response.json();
+      if (data.transcript) {
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === audioMessageId
+              ? { ...message, content: data.transcript }
+              : message
+          )
+        );
+      }
       setMessages((prev) => [
         ...prev,
         {
