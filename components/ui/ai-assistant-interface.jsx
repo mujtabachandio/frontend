@@ -37,6 +37,7 @@ export function AIAssistantInterface() {
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
   const audioRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
 
   useEffect(() => {
@@ -100,6 +101,47 @@ export function AIAssistantInterface() {
     audio.play().catch(() => {});
   }
 
+  function stopResponse() {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setIsLoading(false);
+    setMessages((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      if (
+        last.role === "assistant" &&
+        (!last.content || last.content.trim() === "") &&
+        (!last.sources || last.sources.length === 0)
+      ) {
+        return prev.slice(0, -1);
+      }
+      return prev;
+    });
+  }
+
+  async function clearChat() {
+    stopResponse();
+    setMessages([]);
+    setHasStarted(false);
+    sessionStorage.removeItem("iba_chat_messages");
+    sessionStorage.removeItem("iba_chat_started");
+    const activeSessionId = ensureSessionId();
+    try {
+      await fetch("/api/v1/reset", {
+        method: "POST",
+        headers: { "X-Session-Id": activeSessionId },
+      });
+    } catch {
+      // ignore reset errors
+    }
+  }
+
   function createMessageId() {
     return typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID()
@@ -123,10 +165,7 @@ export function AIAssistantInterface() {
     setError("");
     setInputValue("");
     setHasStarted(true);
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
+    stopResponse();
     setMessages((prev) => [
       ...prev,
       { id: createMessageId(), role: "user", content: text },
@@ -135,6 +174,8 @@ export function AIAssistantInterface() {
     setIsLoading(true);
     try {
       const activeSessionId = ensureSessionId();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
       const assistantId = createMessageId();
       setMessages((prev) => [
         ...prev,
@@ -147,6 +188,7 @@ export function AIAssistantInterface() {
           "Content-Type": "application/json",
           "X-Session-Id": activeSessionId,
         },
+        signal: controller.signal,
         body: JSON.stringify({ text }),
       });
       if (!response.ok) {
@@ -183,6 +225,7 @@ export function AIAssistantInterface() {
               )
             );
             setIsLoading(false);
+            abortControllerRef.current = null;
           } else if (payload.type === "audio") {
             playAudio(payload.audio_base64);
           } else if (payload.type === "audio_error") {
@@ -193,9 +236,12 @@ export function AIAssistantInterface() {
         }
       }
     } catch (err) {
-      setError("Could not fetch a response. Try again.");
+      if (err?.name !== "AbortError") {
+        setError("Could not fetch a response. Try again.");
+      }
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   }
 
@@ -203,10 +249,7 @@ export function AIAssistantInterface() {
     if (!blob) return;
     setError("");
     setIsLoading(true);
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
+    stopResponse();
     const audioMessageId = createMessageId();
     setMessages((prev) => [
       ...prev,
@@ -216,9 +259,12 @@ export function AIAssistantInterface() {
       const formData = new FormData();
       formData.append("audio", blob, "recording.webm");
       const activeSessionId = ensureSessionId();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
       const response = await fetch("/api/v1/ask", {
         method: "POST",
         headers: { "X-Session-Id": activeSessionId },
+        signal: controller.signal,
         body: formData,
       });
       if (!response.ok) {
@@ -245,9 +291,12 @@ export function AIAssistantInterface() {
       ]);
       playAudio(data.audio_base64);
     } catch (err) {
-      setError("Could not process the audio. Try again.");
+      if (err?.name !== "AbortError") {
+        setError("Could not process the audio. Try again.");
+      }
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   }
 
@@ -312,10 +361,26 @@ export function AIAssistantInterface() {
       </div>
 
       <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2">
-        <div className="text-[11px] text-slate-500">
-          Voice answers play automatically after a response.
+        <div className="flex items-center gap-3 text-[11px] text-slate-500">
+          <span>Voice answers play automatically after a response.</span>
+          <button
+            type="button"
+            onClick={clearChat}
+            className="text-[11px] text-slate-500 hover:text-slate-700 underline"
+          >
+            Clear
+          </button>
         </div>
         <div className="flex items-center gap-2">
+          {isLoading && (
+            <button
+              type="button"
+              onClick={stopResponse}
+              className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-200"
+            >
+              Stop
+            </button>
+          )}
           <button
             type="button"
             onClick={isRecording ? stopRecording : startRecording}
