@@ -271,11 +271,16 @@ export function AIAssistantInterface() {
         throw new Error("Request failed.");
       }
       const data = await response.json();
-      if (data.transcript) {
+      if (typeof data.transcript === "string") {
+        const transcript = data.transcript.trim();
         setMessages((prev) =>
           prev.map((message) =>
             message.id === audioMessageId
-              ? { ...message, content: data.transcript }
+              ? {
+                  ...message,
+                  content:
+                    transcript || "Voice message (couldn't transcribe clearly)",
+                }
               : message
           )
         );
