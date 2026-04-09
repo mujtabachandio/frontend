@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-
 export default function AdminPage() {
   const [token, setToken] = useState("");
   const [isAuthed, setIsAuthed] = useState(false);
@@ -24,7 +22,7 @@ export default function AdminPage() {
 
   async function fetchPolicies(authToken) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/policies`, {
+      const response = await fetch("/api/v1/policies", {
         headers: { "X-Admin-Token": authToken },
       });
       if (!response.ok) {
@@ -55,7 +53,7 @@ export default function AdminPage() {
       if (effectiveDate) {
         formData.append("effective_date", effectiveDate);
       }
-      const response = await fetch(`${API_BASE_URL}/api/v1/upload-policy`, {
+      const response = await fetch("/api/v1/upload-policy", {
         method: "POST",
         headers: { "X-Admin-Token": token },
         body: formData,
@@ -75,7 +73,7 @@ export default function AdminPage() {
   async function handleDelete(fileName) {
     setStatus("Deleting...");
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/delete-policy`, {
+      const response = await fetch("/api/v1/delete-policy", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

@@ -6,9 +6,7 @@ import { ArrowUp, Mic } from "lucide-react";
 
 import { DotLoader } from "@/components/dot-loader";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-
-
+// Same-origin /api/v1 — Next rewrites proxy to BACKEND_URL (avoids browser CORS to Render).
 
 const SEND_DOT_FRAMES = [
   [0, 2, 4, 6, 20, 34, 48, 46, 44, 42, 28, 14, 8, 22, 36, 38, 40, 26, 12, 10, 16, 30, 24, 18, 32],
@@ -143,7 +141,7 @@ export function AIAssistantInterface() {
         { id: assistantId, role: "assistant", content: "", sources: [] },
       ]);
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/ask-stream`, {
+      const response = await fetch("/api/v1/ask-stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -218,7 +216,7 @@ export function AIAssistantInterface() {
       const formData = new FormData();
       formData.append("audio", blob, "recording.webm");
       const activeSessionId = ensureSessionId();
-      const response = await fetch(`${API_BASE_URL}/api/v1/ask`, {
+      const response = await fetch("/api/v1/ask", {
         method: "POST",
         headers: { "X-Session-Id": activeSessionId },
         body: formData,
