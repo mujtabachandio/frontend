@@ -35,12 +35,20 @@ export default function AdminPage() {
     }
   }
 
-  async function handleLogin() {
+  function handleLogin() {
     if (!token) return;
     sessionStorage.setItem("adminToken", token);
     setIsAuthed(true);
     setStatus("");
-    await fetchPolicies(token);
+  }
+
+  function handleSignOut() {
+    sessionStorage.removeItem("adminToken");
+    setToken("");
+    setIsAuthed(false);
+    setPolicies([]);
+    setStatus("");
+    setFile(null);
   }
 
   async function handleUpload() {
@@ -101,9 +109,10 @@ export default function AdminPage() {
     return (
       <div className="min-h-screen bg-slate-50 px-6 py-12">
         <div className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-semibold">Admin Login</h1>
+          <h1 className="text-xl font-semibold">Policy admin</h1>
           <p className="mt-2 text-sm text-slate-600">
-            Enter the admin token to manage policy documents.
+            Enter the admin token (same as <code className="text-xs">ADMIN_TOKEN</code> on the
+            server) to upload or remove policy PDFs. The public chat does not require login.
           </p>
           <input
             type="password"
@@ -128,50 +137,86 @@ export default function AdminPage() {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <header className="flex flex-col gap-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Admin Dashboard
+            Policy admin
           </p>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-semibold">Manage Policies</h1>
-            <Link
-              href="/"
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-            >
-              Back to chat
-            </Link>
+            <div className="flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="text-sm font-medium text-slate-500 hover:text-slate-700"
+              >
+                Sign out
+              </button>
+              <Link
+                href="/"
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                Back to chat
+              </Link>
+            </div>
           </div>
         </header>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold">Upload Policy</h2>
-          <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center">
-            <input
-              type="file"
-              accept="application/pdf"
-              onChange={(event) => setFile(event.target.files?.[0] || null)}
-              className="w-full text-sm"
-            />
-            <input
-              type="date"
-              value={effectiveDate}
-              onChange={(event) => setEffectiveDate(event.target.value)}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-            />
-            <select
-              value={version}
-              onChange={(event) => setVersion(event.target.value)}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-            >
-              <option value="current">Current</option>
-              <option value="archived">Archived</option>
-            </select>
+          <p className="mt-1 text-sm text-slate-500">
+            PDF only. Set an optional effective date and version before uploading.
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4 lg:items-end">
+            <div className="flex flex-col gap-1 md:col-span-2">
+              <label className="text-xs font-medium text-slate-600">PDF file</label>
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={(event) => setFile(event.target.files?.[0] || null)}
+                className="w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+              />
+              {file && (
+                <p className="text-xs text-slate-600">
+                  Selected: <span className="font-medium">{file.name}</span>
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-600">
+                Effective date (optional)
+              </label>
+              <input
+                type="date"
+                value={effectiveDate}
+                onChange={(event) => setEffectiveDate(event.target.value)}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-600">Version</label>
+              <select
+                value={version}
+                onChange={(event) => setVersion(event.target.value)}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              >
+                <option value="current">Current</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+          </div>
+          <div className="mt-4">
             <button
+              type="button"
               onClick={handleUpload}
-              className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
+              disabled={!file}
+              className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Upload
             </button>
           </div>
-          {status && <p className="mt-3 text-sm text-slate-600">{status}</p>}
+          {status && (
+            <p className="mt-3 text-sm text-slate-600" role="status">
+              {status}
+            </p>
+          )}
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

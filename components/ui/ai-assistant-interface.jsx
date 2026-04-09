@@ -5,8 +5,9 @@ import Image from "next/image";
 import { ArrowUp, Mic } from "lucide-react";
 
 import { DotLoader } from "@/components/dot-loader";
+import { apiFetch, publicApiUrl } from "@/lib/api";
 
-// Same-origin /api/v1 — Next rewrites proxy to BACKEND_URL (avoids browser CORS to Render).
+// Default: same-origin /api/v1 (Next rewrites). Set NEXT_PUBLIC_BACKEND_URL for direct API + smooth SSE.
 
 const SEND_DOT_FRAMES = [
   [0, 2, 4, 6, 20, 34, 48, 46, 44, 42, 28, 14, 8, 22, 36, 38, 40, 26, 12, 10, 16, 30, 24, 18, 32],
@@ -91,14 +92,20 @@ export function AIAssistantInterface() {
   }
 
   function playAudio(base64) {
-    if (!base64) return;
+    if (!base64 || typeof base64 !== "string") return;
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
+    // OpenAI speech API returns MP3 by default (audio/mpeg).
     const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
+    audio.playsInline = true;
     audioRef.current = audio;
-    audio.play().catch(() => {});
+    void audio.play().catch(() => {
+      setError(
+        "Audio reply could not play (browser blocked autoplay). Tap once on the page, then send your message again."
+      );
+    });
   }
 
   function stopResponse() {
@@ -133,7 +140,7 @@ export function AIAssistantInterface() {
     sessionStorage.removeItem("iba_chat_started");
     const activeSessionId = ensureSessionId();
     try {
-      await fetch("/api/v1/reset", {
+      await apiFetch(publicApiUrl("/api/v1/reset"), {
         method: "POST",
         headers: { "X-Session-Id": activeSessionId },
       });
@@ -182,7 +189,7 @@ export function AIAssistantInterface() {
         { id: assistantId, role: "assistant", content: "", sources: [] },
       ]);
 
-      const response = await fetch("/api/v1/ask-stream", {
+      const response = await apiFetch(publicApiUrl("/api/v1/ask-stream"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -237,7 +244,15 @@ export function AIAssistantInterface() {
       }
     } catch (err) {
       if (err?.name !== "AbortError") {
-        setError("Could not fetch a response. Try again.");
+        const net =
+          err?.message === "Failed to fetch" ||
+          (typeof err?.message === "string" && err.message.includes("NetworkError")) ||
+          err?.name === "TypeError";
+        setError(
+          net
+            ? "Cannot reach the API. Start the backend (port 8000), then refresh — or run .\\start-local.ps1 from the project folder."
+            : err?.message || "Could not fetch a response. Try again."
+        );
       }
     } finally {
       setIsLoading(false);
@@ -261,7 +276,7 @@ export function AIAssistantInterface() {
       const activeSessionId = ensureSessionId();
       const controller = new AbortController();
       abortControllerRef.current = controller;
-      const response = await fetch("/api/v1/ask", {
+      const response = await apiFetch(publicApiUrl("/api/v1/ask"), {
         method: "POST",
         headers: { "X-Session-Id": activeSessionId },
         signal: controller.signal,
@@ -297,7 +312,15 @@ export function AIAssistantInterface() {
       playAudio(data.audio_base64);
     } catch (err) {
       if (err?.name !== "AbortError") {
-        setError("Could not process the audio. Try again.");
+        const net =
+          err?.message === "Failed to fetch" ||
+          (typeof err?.message === "string" && err.message.includes("NetworkError")) ||
+          err?.name === "TypeError";
+        setError(
+          net
+            ? "Cannot reach the API. Start the backend on port 8000, then try again."
+            : "Could not process the audio. Try again."
+        );
       }
     } finally {
       setIsLoading(false);
@@ -438,7 +461,8 @@ export function AIAssistantInterface() {
             width={160}
             height={50}
             priority
-            className="h-auto w-[120px] md:w-[160px]"
+            className="w-[120px] md:w-[160px]"
+            style={{ height: "auto" }}
           />
         </div>
 
